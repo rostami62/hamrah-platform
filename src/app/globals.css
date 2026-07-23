@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   توکن‌های طراحی «همراه»
+   پالت: فیروزه‌ای امید (Primary) + کهربایی گرم (Accent)
+   Persian-first, RTL, Mobile-first
+   ========================================================================== */
+@theme {
+  --font-sans: var(--font-vazirmatn), system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+
+  /* Primary — فیروزه‌ای (امید، آرامش، سلامت) */
+  --color-primary-50: #eefbfa;
+  --color-primary-100: #d4f4f1;
+  --color-primary-200: #ade8e2;
+  --color-primary-300: #78d4cc;
+  --color-primary-400: #43b7ad;
+  --color-primary-500: #269c92;
+  --color-primary-600: #1c7d76;
+  --color-primary-700: #1a645f;
+  --color-primary-800: #19504d;
+  --color-primary-900: #184341;
+
+  /* Accent — کهربایی گرم (انرژی، همدلی، هشدارهای مهربان) */
+  --color-accent-50: #fff8ec;
+  --color-accent-100: #ffecc8;
+  --color-accent-200: #ffd68c;
+  --color-accent-300: #ffbc4f;
+  --color-accent-400: #ffa324;
+  --color-accent-500: #f7860a;
+  --color-accent-600: #d66505;
+  --color-accent-700: #b14a08;
+
+  /* سطوح و پس‌زمینه */
+  --color-bg: #f7f9f8;
+  --color-surface: #ffffff;
+  --color-surface-2: #f0f4f3;
+  --color-line: #e2e9e7;
+
+  /* رنگ‌های معنایی */
+  --color-success: #1c7d76;
+  --color-warning: #c9840f;
+  --color-danger: #c0392f;
+  --color-info: #3a6fa8;
+
+  --radius-card: 1rem;
+  --radius-control: 0.625rem;
+}
+
+/* حالت تیره — با ویژگی data-theme روی <html> فعال می‌شود */
+[data-theme="dark"] {
+  --color-bg: #0f1413;
+  --color-surface: #171d1c;
+  --color-surface-2: #1e2624;
+  --color-line: #2b3634;
+  --color-primary-50: #142b29;
+  --color-primary-100: #19403c;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-primary-900);
+    font-feature-settings: "ss01", "ss02";
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .surface {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+
+  .field-input {
+    width: 100%;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    padding: 0.6rem 0.85rem;
+    font-size: 0.875rem;
+    color: var(--color-primary-900);
+  }
+  .field-input:focus {
+    outline: none;
+    border-color: var(--color-primary-400);
+    box-shadow: 0 0 0 3px var(--color-primary-100);
+  }
+}
