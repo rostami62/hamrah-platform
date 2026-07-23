@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Vazirmatn } from "next/font/google";
 import { ServiceWorkerProvider } from "@/components/providers/service-worker-provider";
 import "./globals.css";
+export const dynamic = 'force-dynamic';
 
 const vazirmatn = Vazirmatn({
   subsets: ["arabic", "latin"],
