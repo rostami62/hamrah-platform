@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service-client";
 import { nationalIdToAuthEmail } from "@/lib/auth/national-id-email";
+import { ensureProfile } from "@/lib/auth/ensure-profile";
 import { validateNationalId } from "@/lib/validation/national-id";
 import { ROLE_DASHBOARD_PATH, type UserRole } from "@/types/roles";
 
@@ -88,13 +89,16 @@ export async function loginAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user!.id)
-    .single();
 
-  redirect(ROLE_DASHBOARD_PATH[(profile?.role ?? "parent") as UserRole]);
+  // معمولاً از trigger پایگاه‌داده (handle_new_user) خوانده می‌شود؛ اگر آن
+  // به هر دلیل profile را نساخته باشد، اینجا از روی متادیتای حساب بازسازی
+  // می‌شود تا کاربر با وجود ورود موفق، توسط middleware به /login برنگردد.
+  const profile = await ensureProfile(user!);
+  if (!profile) {
+    return { error: "ورود موفق بود اما پروفایل کاربری پیدا نشد؛ با پشتیبانی تماس بگیرید." };
+  }
+
+  redirect(ROLE_DASHBOARD_PATH[profile.role]);
 }
 
 export async function logoutAction(): Promise<void> {

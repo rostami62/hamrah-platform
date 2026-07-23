@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { ensureProfile } from "@/lib/auth/ensure-profile";
 import type { Database } from "@/types/database";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -22,7 +23,8 @@ export async function getCurrentProfile(): Promise<Profile | null> {
       .eq("id", user.id)
       .single();
 
-    return profile ?? null;
+    // پوشش خطای گذرای trigger هنگام ساخت حساب (رجوع به ensure-profile.ts)
+    return profile ?? (await ensureProfile(user));
   } catch (error) {
     console.error("getCurrentProfile failed:", error);
     return null;

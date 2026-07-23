@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 import { ROLE_DASHBOARD_PATH, type UserRole } from "@/types/roles";
+import { ensureProfile } from "@/lib/auth/ensure-profile";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -55,7 +56,10 @@ export async function middleware(request: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  const role = profile?.role as UserRole | undefined;
+  // اگر trigger هنگام ساخت حساب profile را نساخته باشد، کاربر احرازهویت‌شده
+  // اینجا بازسازی می‌شود؛ در غیر این صورت با اینکه ورودش موفق بوده، همیشه
+  // به /login برمی‌گشت (به نظر می‌رسید «ورود کار نمی‌کند»).
+  const role = (profile?.role ?? (await ensureProfile(user))?.role) as UserRole | undefined;
   if (!role) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
