@@ -77,6 +77,12 @@ export async function loginAction(
   }
 
   const supabase = await createClient();
+
+  // اگر نشست قبلیِ کاربر دیگری هنوز فعال باشد، signInWithPassword روی
+  // همان کلاینت می‌تواند بی‌صدا رد شود؛ برای تعویض حساب، ابتدا خروج
+  // از نشست قبلی تضمین می‌شود.
+  await supabase.auth.signOut();
+
   const { error } = await supabase.auth.signInWithPassword({
     email: nationalIdToAuthEmail(nationalId),
     password,
