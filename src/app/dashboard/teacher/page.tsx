@@ -19,8 +19,7 @@ export default async function TeacherDashboardPage() {
       <div className="mt-8 flex flex-col gap-3">
         {(files ?? []).length === 0 ? (
           <div className="surface rounded-[var(--radius-card)] p-6 text-sm text-primary-600">
-            هنوز دانش‌آموزی به حساب شما متصل نشده است. اتصال معلم به پرونده
-            (توسط مددکار یا والدین) در نسخه‌ی بعدی سامانه اضافه می‌شود.
+            هنوز دانش‌آموزی توسط مددکار اجتماعی به حساب شما ارجاع نشده است.
           </div>
         ) : (
           files!.map((file) => (

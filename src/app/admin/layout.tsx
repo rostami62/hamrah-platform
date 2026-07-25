@@ -1,14 +1,8 @@
-import type { Metadata } from "next";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { SkipToContent } from "@/components/layout/skip-to-content";
 import { getCurrentProfile } from "@/lib/auth/session";
 
-// دفاع در عمق علاوه بر Disallow در robots.ts — پرونده‌های کودکان هرگز نباید ایندکس شوند.
-export const metadata: Metadata = {
-  robots: { index: false, follow: false, nocache: true },
-};
-
-export default async function DashboardLayout({
+export default async function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const profile = await getCurrentProfile();

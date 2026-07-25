@@ -37,7 +37,7 @@ export default async function DoctorDashboardPage() {
       <div className="mt-8 flex flex-col gap-3">
         {(files ?? []).length === 0 && (
           <p className="text-sm text-primary-600">
-            هنوز پرونده‌ای از طریق لینک خوداظهاری به شما متصل نشده است.
+            هنوز پرونده‌ای توسط مددکار اجتماعی به شما ارجاع نشده است.
           </p>
         )}
         {(files ?? []).map((file) => {
@@ -45,12 +45,14 @@ export default async function DoctorDashboardPage() {
           return (
             <article key={file.id} className="surface rounded-[var(--radius-card)] p-5">
               <h3 className="font-semibold text-primary-900">{file.child_full_name}</h3>
-              {report && (
+              {report ? (
                 <p className="mt-1 text-sm text-primary-600">
                   {DISEASE_TYPE_OPTIONS[report.disease_type as keyof typeof DISEASE_TYPE_OPTIONS] ?? report.disease_type}
                   {" — "}
                   {PROGNOSIS_OPTIONS[report.prognosis as keyof typeof PROGNOSIS_OPTIONS] ?? report.prognosis}
                 </p>
+              ) : (
+                <p className="mt-1 text-sm text-primary-600">پرونده به شما ارجاع شده؛ گزارش درمان هنوز ثبت نشده است.</p>
               )}
             </article>
           );

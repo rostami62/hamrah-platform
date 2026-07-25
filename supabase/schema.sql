@@ -190,6 +190,16 @@ create policy "profiles_update_own_or_admin"
   on public.profiles for update
   using (id = auth.uid() or public.current_role() = 'admin');
 
+-- مددکار برای ارجاع مستقیم پرونده، باید فهرست متخصصان تاییدشده را ببیند
+-- (فقط id/full_name لازم است اما ستون‌های حساس دیگری در profiles نیست)
+create policy "profiles_select_specialists_for_referral"
+  on public.profiles for select
+  using (
+    role in ('doctor', 'teacher')
+    and verified = true
+    and public.current_role() = 'social-worker'
+  );
+
 -- patient_files: مددکارِ سازنده، والد/پزشک/معلمِ متصل، یا ادمین
 create policy "patient_files_select_related"
   on public.patient_files for select
