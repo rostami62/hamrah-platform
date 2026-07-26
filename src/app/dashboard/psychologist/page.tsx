@@ -1,9 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/session";
-import { DISEASE_TYPE_OPTIONS, PROGNOSIS_OPTIONS } from "@/lib/roadmap/options";
 import { CaseNoteForm } from "@/components/patient-files/case-note-form";
 
-export default async function DoctorDashboardPage() {
+export default async function PsychologistDashboardPage() {
   const profile = await getCurrentProfile();
 
   if (!profile?.verified) {
@@ -22,22 +21,17 @@ export default async function DoctorDashboardPage() {
   const { data: files } = await supabase
     .from("patient_files")
     .select("id, child_full_name, status, created_at")
-    .eq("doctor_id", profile.id)
+    .eq("psychologist_id", profile.id)
     .order("created_at", { ascending: false });
 
   const fileIds = (files ?? []).map((f) => f.id);
-  const [{ data: reports }, { data: notes }] = await Promise.all([
-    fileIds.length
-      ? supabase.from("doctor_reports").select("patient_file_id, disease_type, prognosis").in("patient_file_id", fileIds)
-      : Promise.resolve({ data: [] as { patient_file_id: string; disease_type: string; prognosis: string }[] }),
-    fileIds.length
-      ? supabase.from("case_notes").select("patient_file_id, note").eq("role", "doctor").in("patient_file_id", fileIds)
-      : Promise.resolve({ data: [] as { patient_file_id: string; note: string }[] }),
-  ]);
+  const { data: notes } = fileIds.length
+    ? await supabase.from("case_notes").select("patient_file_id, note").eq("role", "psychologist").in("patient_file_id", fileIds)
+    : { data: [] as { patient_file_id: string; note: string }[] };
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
-      <h1 className="text-2xl font-bold text-primary-900">داشبورد پزشک</h1>
+      <h1 className="text-2xl font-bold text-primary-900">داشبورد روان‌شناس / مشاور</h1>
       <p className="mt-2 text-primary-700">خوش آمدید، {profile.full_name}.</p>
 
       <div className="mt-8 flex flex-col gap-3">
@@ -47,19 +41,11 @@ export default async function DoctorDashboardPage() {
           </p>
         )}
         {(files ?? []).map((file) => {
-          const report = (reports ?? []).find((r) => r.patient_file_id === file.id);
           const note = (notes ?? []).find((n) => n.patient_file_id === file.id);
           return (
             <article key={file.id} className="surface rounded-[var(--radius-card)] p-5">
               <h3 className="font-semibold text-primary-900">{file.child_full_name}</h3>
-              {report && (
-                <p className="mt-1 text-sm text-primary-600">
-                  {DISEASE_TYPE_OPTIONS[report.disease_type as keyof typeof DISEASE_TYPE_OPTIONS] ?? report.disease_type}
-                  {" — "}
-                  {PROGNOSIS_OPTIONS[report.prognosis as keyof typeof PROGNOSIS_OPTIONS] ?? report.prognosis}
-                </p>
-              )}
-              <CaseNoteForm patientFileId={file.id} role="doctor" initialNote={note?.note ?? ""} />
+              <CaseNoteForm patientFileId={file.id} role="psychologist" initialNote={note?.note ?? ""} />
             </article>
           );
         })}

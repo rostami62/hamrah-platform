@@ -15,13 +15,14 @@ export default async function SocialWorkerDashboardPage() {
   const profile = await getCurrentProfile();
   const supabase = await createClient();
 
-  const [{ data: files }, { data: doctors }, { data: teachers }] = await Promise.all([
+  const [{ data: files }, { data: doctors }, { data: psychologists }, { data: teachers }] = await Promise.all([
     supabase
       .from("patient_files")
-      .select("id, child_full_name, status, doctor_id, teacher_id, created_at")
+      .select("id, child_full_name, status, doctor_id, psychologist_id, teacher_id, created_at")
       .eq("created_by", profile!.id)
       .order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, full_name").eq("role", "doctor").eq("verified", true),
+    supabase.from("profiles").select("id, full_name").eq("role", "psychologist").eq("verified", true),
     supabase.from("profiles").select("id, full_name").eq("role", "teacher").eq("verified", true),
   ]);
 
@@ -60,8 +61,10 @@ export default async function SocialWorkerDashboardPage() {
                 <AssignSpecialistForm
                   patientFileId={file.id}
                   doctors={doctors ?? []}
+                  psychologists={psychologists ?? []}
                   teachers={teachers ?? []}
                   currentDoctorId={file.doctor_id}
+                  currentPsychologistId={file.psychologist_id}
                   currentTeacherId={file.teacher_id}
                 />
 

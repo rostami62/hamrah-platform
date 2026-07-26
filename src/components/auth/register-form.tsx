@@ -7,7 +7,7 @@ import { Field } from "@/components/ui/field";
 import { ROLE_LABELS_FA } from "@/types/roles";
 
 const initialState: ActionState = {};
-const SELF_REGISTERABLE_ROLES = ["doctor", "teacher", "donor"] as const;
+const SELF_REGISTERABLE_ROLES = ["doctor", "psychologist", "teacher", "donor"] as const;
 
 export function RegisterForm() {
   const [state, formAction, pending] = useActionState(registerAction, initialState);
@@ -48,8 +48,8 @@ export function RegisterForm() {
       {state.error && <p className="text-sm text-danger">{state.error}</p>}
 
       <p className="text-xs text-primary-500">
-        حساب پزشک/روان‌شناس تا تایید هویت توسط مدیر سیستم، دسترسی محدود
-        خواهد داشت.
+        حساب پزشک یا روان‌شناس/مشاور تا تایید هویت توسط مدیر سیستم، دسترسی
+        محدود خواهد داشت.
       </p>
 
       <Button type="submit" disabled={pending}>

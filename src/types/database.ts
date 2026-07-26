@@ -9,6 +9,7 @@
  */
 export type UserRole =
   | "doctor"
+  | "psychologist"
   | "social-worker"
   | "parent"
   | "teacher"
@@ -24,6 +25,8 @@ export type PatientFileStatus =
 export type SelfReportRole = "doctor" | "parent";
 
 export type SupportRequestStatus = "pending" | "approved" | "fulfilled" | "rejected";
+
+export type CaseNoteRole = "doctor" | "psychologist" | "teacher";
 
 export interface Database {
   public: {
@@ -59,6 +62,7 @@ export interface Database {
           created_by: string;
           parent_id: string | null;
           doctor_id: string | null;
+          psychologist_id: string | null;
           teacher_id: string | null;
           status: PatientFileStatus;
           created_at: string;
@@ -73,6 +77,7 @@ export interface Database {
         Update: Partial<{
           parent_id: string | null;
           doctor_id: string | null;
+          psychologist_id: string | null;
           teacher_id: string | null;
           status: PatientFileStatus;
         }>;
@@ -214,6 +219,25 @@ export interface Database {
           target_id?: string | null;
         };
         Update: Partial<{ action: string }>;
+        Relationships: [];
+      };
+      case_notes: {
+        Row: {
+          id: string;
+          patient_file_id: string;
+          role: CaseNoteRole;
+          author_id: string;
+          note: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          patient_file_id: string;
+          role: CaseNoteRole;
+          author_id: string;
+          note: string;
+        };
+        Update: Partial<{ note: string }>;
         Relationships: [];
       };
     };

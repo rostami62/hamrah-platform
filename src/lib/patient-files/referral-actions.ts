@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service-client";
 import type { ActionState } from "@/lib/auth/actions";
+import type { ReferrableSpecialistRole } from "@/types/roles";
+
+const REFERRABLE_ROLES: ReferrableSpecialistRole[] = ["doctor", "psychologist", "teacher"];
 
 /**
  * ارجاع مستقیم پرونده به یک متخصص تاییدشده (بدون نیاز به لینک خوداظهاری
- * پیامکی) — doctor_id/teacher_id همان ستون‌هایی هستند که داشبورد پزشک/
- * معلم برای فیلتر «پرونده‌های متصل به من» استفاده می‌کند.
+ * پیامکی) — doctor_id/psychologist_id/teacher_id همان ستون‌هایی هستند که
+ * داشبورد هر نقش برای فیلتر «پرونده‌های متصل به من» استفاده می‌کند.
  */
 export async function assignSpecialistAction(
   _prevState: ActionState,
@@ -21,9 +24,10 @@ export async function assignSpecialistAction(
   if (!patientFileId || !profileId) {
     return { error: "یک متخصص را انتخاب کنید." };
   }
-  if (specialistRole !== "doctor" && specialistRole !== "teacher") {
+  if (!REFERRABLE_ROLES.includes(specialistRole as ReferrableSpecialistRole)) {
     return { error: "نقش نامعتبر است." };
   }
+  const role = specialistRole as ReferrableSpecialistRole;
 
   const supabase = await createClient();
   const {
@@ -31,7 +35,12 @@ export async function assignSpecialistAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: "لطفاً دوباره وارد شوید." };
 
-  const update = specialistRole === "doctor" ? { doctor_id: profileId } : { teacher_id: profileId };
+  const update =
+    role === "doctor"
+      ? { doctor_id: profileId }
+      : role === "psychologist"
+        ? { psychologist_id: profileId }
+        : { teacher_id: profileId };
 
   const { error } = await supabase
     .from("patient_files")
@@ -44,7 +53,7 @@ export async function assignSpecialistAction(
   const service = createServiceClient();
   await service.from("audit_logs").insert({
     actor_id: user.id,
-    action: specialistRole === "doctor" ? "doctor_assigned" : "teacher_assigned",
+    action: `${role}_assigned`,
     target_table: "patient_files",
     target_id: patientFileId,
   });

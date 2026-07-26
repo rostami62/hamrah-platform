@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { assignSpecialistAction } from "@/lib/patient-files/referral-actions";
 import type { ActionState } from "@/lib/auth/actions";
+import type { ReferrableSpecialistRole } from "@/types/roles";
 
 interface Specialist {
   id: string;
@@ -14,25 +15,37 @@ const initialState: ActionState = {};
 export function AssignSpecialistForm({
   patientFileId,
   doctors,
+  psychologists,
   teachers,
   currentDoctorId,
+  currentPsychologistId,
   currentTeacherId,
 }: {
   patientFileId: string;
   doctors: Specialist[];
+  psychologists: Specialist[];
   teachers: Specialist[];
   currentDoctorId: string | null;
+  currentPsychologistId: string | null;
   currentTeacherId: string | null;
 }) {
   return (
-    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+    <div className="mt-3 grid gap-3 sm:grid-cols-3">
       <AssignRow
         patientFileId={patientFileId}
         specialistRole="doctor"
-        label="ارجاع به پزشک / روان‌شناس"
+        label="ارجاع به پزشک"
         options={doctors}
         currentId={currentDoctorId}
         emptyLabel="پزشک تاییدشده‌ای موجود نیست"
+      />
+      <AssignRow
+        patientFileId={patientFileId}
+        specialistRole="psychologist"
+        label="ارجاع به روان‌شناس / مشاور"
+        options={psychologists}
+        currentId={currentPsychologistId}
+        emptyLabel="روان‌شناس تاییدشده‌ای موجود نیست"
       />
       <AssignRow
         patientFileId={patientFileId}
@@ -55,7 +68,7 @@ function AssignRow({
   emptyLabel,
 }: {
   patientFileId: string;
-  specialistRole: "doctor" | "teacher";
+  specialistRole: ReferrableSpecialistRole;
   label: string;
   options: Specialist[];
   currentId: string | null;

@@ -13,7 +13,7 @@ export interface ActionState {
 }
 
 /** نقش‌هایی که خودشان می‌توانند ثبت‌نام کنند؛ مددکار/ادمین را فقط ادمین می‌سازد. */
-const SELF_REGISTERABLE_ROLES: UserRole[] = ["doctor", "teacher", "donor"];
+const SELF_REGISTERABLE_ROLES: UserRole[] = ["doctor", "psychologist", "teacher", "donor"];
 
 export async function registerAction(
   _prevState: ActionState,

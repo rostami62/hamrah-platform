@@ -10,7 +10,7 @@ create extension if not exists "pgcrypto";
 -- ------------------------------------------------------------
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
-  role text not null check (role in ('doctor', 'social-worker', 'parent', 'teacher', 'donor', 'admin')),
+  role text not null check (role in ('doctor', 'psychologist', 'social-worker', 'parent', 'teacher', 'donor', 'admin')),
   national_id text not null unique,
   full_name text not null,
   verified boolean not null default true,
@@ -27,6 +27,7 @@ create table public.patient_files (
   created_by uuid not null references public.profiles (id),
   parent_id uuid references public.profiles (id),
   doctor_id uuid references public.profiles (id),
+  psychologist_id uuid references public.profiles (id),
   teacher_id uuid references public.profiles (id),
   status text not null default 'draft'
     check (status in ('draft', 'awaiting_doctor', 'awaiting_parent', 'active')),
@@ -102,6 +103,18 @@ create table public.audit_logs (
   created_at timestamptz not null default now()
 );
 
+-- یادداشت/گزارش آزاد قابل‌ویرایش هر متخصص برای یک پرونده — یک ردیف به‌ازای
+-- هر (پرونده، نقش)، مستقل از گزارش ساختاریافته‌ی خوداظهاری پزشک (doctor_reports).
+create table public.case_notes (
+  id uuid primary key default gen_random_uuid(),
+  patient_file_id uuid not null references public.patient_files (id) on delete cascade,
+  role text not null check (role in ('doctor', 'psychologist', 'teacher')),
+  author_id uuid not null references public.profiles (id),
+  note text not null default '',
+  updated_at timestamptz not null default now(),
+  unique (patient_file_id, role)
+);
+
 -- دید غیرشخصی برای داشبورد خیّرین: فقط نیازهای تاییدشده، بدون هیچ داده‌ی
 -- شناسایی‌کننده‌ی کودک یا خانواده.
 create view public.donor_visible_requests as
@@ -139,7 +152,7 @@ begin
     new.raw_user_meta_data ->> 'role',
     new.raw_user_meta_data ->> 'national_id',
     new.raw_user_meta_data ->> 'full_name',
-    coalesce((new.raw_user_meta_data ->> 'role') != 'doctor', true)
+    coalesce((new.raw_user_meta_data ->> 'role') not in ('doctor', 'psychologist'), true)
   );
   return new;
 end;
@@ -180,6 +193,7 @@ alter table public.parent_reports enable row level security;
 alter table public.mental_health_results enable row level security;
 alter table public.support_requests enable row level security;
 alter table public.audit_logs enable row level security;
+alter table public.case_notes enable row level security;
 
 -- profiles: هر کاربر پروفایل خودش را می‌بیند/ویرایش می‌کند؛ ادمین همه را می‌بیند.
 create policy "profiles_select_own_or_admin"
@@ -195,18 +209,19 @@ create policy "profiles_update_own_or_admin"
 create policy "profiles_select_specialists_for_referral"
   on public.profiles for select
   using (
-    role in ('doctor', 'teacher')
+    role in ('doctor', 'psychologist', 'teacher')
     and verified = true
     and public.current_role() = 'social-worker'
   );
 
--- patient_files: مددکارِ سازنده، والد/پزشک/معلمِ متصل، یا ادمین
+-- patient_files: مددکارِ سازنده، والد/پزشک/روان‌شناس/معلمِ متصل، یا ادمین
 create policy "patient_files_select_related"
   on public.patient_files for select
   using (
     created_by = auth.uid()
     or parent_id = auth.uid()
     or doctor_id = auth.uid()
+    or psychologist_id = auth.uid()
     or teacher_id = auth.uid()
     or public.current_role() = 'admin'
   );
@@ -313,3 +328,51 @@ create policy "audit_logs_select_admin"
 -- دسترسی به View برای کاربران احرازهویت‌شده (بدون RLS مستقیم؛ از
 -- security_invoker پیروی می‌کند و صرفاً ردیف‌های already-approved را نشان می‌دهد)
 grant select on public.donor_visible_requests to authenticated;
+
+-- case_notes: مشاهده برای طرف‌های مرتبط با پرونده؛ نوشتن/ویرایش فقط برای
+-- متخصصی که دقیقاً همان نقش را روی همان پرونده دارد (نه نقش‌های دیگر).
+create policy "case_notes_select_related"
+  on public.case_notes for select
+  using (
+    exists (
+      select 1 from public.patient_files pf
+      where pf.id = patient_file_id
+        and (
+          pf.created_by = auth.uid()
+          or pf.parent_id = auth.uid()
+          or pf.doctor_id = auth.uid()
+          or pf.psychologist_id = auth.uid()
+          or pf.teacher_id = auth.uid()
+        )
+    )
+    or public.current_role() = 'admin'
+  );
+
+create policy "case_notes_insert_assigned_specialist"
+  on public.case_notes for insert
+  with check (
+    author_id = auth.uid()
+    and exists (
+      select 1 from public.patient_files pf
+      where pf.id = patient_file_id
+        and (
+          (role = 'doctor' and pf.doctor_id = auth.uid())
+          or (role = 'psychologist' and pf.psychologist_id = auth.uid())
+          or (role = 'teacher' and pf.teacher_id = auth.uid())
+        )
+    )
+  );
+
+create policy "case_notes_update_assigned_specialist"
+  on public.case_notes for update
+  using (
+    exists (
+      select 1 from public.patient_files pf
+      where pf.id = patient_file_id
+        and (
+          (role = 'doctor' and pf.doctor_id = auth.uid())
+          or (role = 'psychologist' and pf.psychologist_id = auth.uid())
+          or (role = 'teacher' and pf.teacher_id = auth.uid())
+        )
+    )
+  );
