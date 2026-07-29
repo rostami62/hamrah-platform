@@ -48,6 +48,9 @@ export function SupportRequestForm({
       <Field label="شهر (اختیاری)">
         <input name="city" className="field-input" />
       </Field>
+      <Field label="مبلغ موردنیاز به تومان (اختیاری)">
+        <input name="requiredAmount" type="number" min={0} step={1} inputMode="numeric" className="field-input" />
+      </Field>
 
       {state.error && <p className="text-sm text-danger">{state.error}</p>}
 

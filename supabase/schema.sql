@@ -31,6 +31,9 @@ create table public.patient_files (
   teacher_id uuid references public.profiles (id),
   status text not null default 'draft'
     check (status in ('draft', 'awaiting_doctor', 'awaiting_parent', 'active')),
+  -- وضعیت کلی/فوریت پرونده — مستقل از status بالا (که فقط تکمیل خوداظهاری را دنبال می‌کند)
+  case_status text not null default 'open' check (case_status in ('open', 'under_review', 'completed')),
+  urgency text not null default 'medium' check (urgency in ('low', 'medium', 'high', 'emergency')),
   created_at timestamptz not null default now()
 );
 
@@ -90,6 +93,8 @@ create table public.support_requests (
   description text not null,
   city text,
   status text not null default 'pending' check (status in ('pending', 'approved', 'fulfilled', 'rejected')),
+  required_amount numeric,
+  raised_amount numeric not null default 0,
   created_by uuid not null references public.profiles (id),
   created_at timestamptz not null default now()
 );
@@ -115,10 +120,82 @@ create table public.case_notes (
   unique (patient_file_id, role)
 );
 
+-- جدول ارجاعات — یک ردیف به‌ازای هر (پرونده، نقشِ ارجاع‌شده)؛ برای
+-- ارجاع هم‌زمان چندگانه (Checkbox) و نشانه‌گذاری وضعیت هر ضلع تخصصی.
+create table public.referrals (
+  id uuid primary key default gen_random_uuid(),
+  case_id uuid not null references public.patient_files (id) on delete cascade,
+  referred_to_role text not null check (referred_to_role in ('doctor', 'psychologist', 'teacher', 'donor')),
+  assigned_to_user_id uuid references public.profiles (id),
+  status text not null default 'pending' check (status in ('pending', 'completed')),
+  created_by uuid not null references public.profiles (id),
+  created_at timestamptz not null default now(),
+  completed_at timestamptz,
+  unique (case_id, referred_to_role)
+);
+
+-- فرم ساختاریافته‌ی پزشک — یک ردیف در حال تکامل به‌ازای هر پرونده
+create table public.medical_reports (
+  id uuid primary key default gen_random_uuid(),
+  patient_file_id uuid not null unique references public.patient_files (id) on delete cascade,
+  author_id uuid not null references public.profiles (id),
+  diagnosis text,
+  medications text,
+  treatment_plan text,
+  next_visit_date date,
+  updated_at timestamptz not null default now()
+);
+
+-- فرم ساختاریافته‌ی روان‌شناس
+create table public.psychology_reports (
+  id uuid primary key default gen_random_uuid(),
+  patient_file_id uuid not null unique references public.patient_files (id) on delete cascade,
+  author_id uuid not null references public.profiles (id),
+  behavioral_assessment text,
+  therapy_session_notes text,
+  mental_status text,
+  updated_at timestamptz not null default now()
+);
+
+-- فرم ساختاریافته‌ی معلم
+create table public.academic_reports (
+  id uuid primary key default gen_random_uuid(),
+  patient_file_id uuid not null unique references public.patient_files (id) on delete cascade,
+  author_id uuid not null references public.profiles (id),
+  academic_performance text,
+  school_behavior text,
+  attendance_status text,
+  educational_needs text,
+  updated_at timestamptz not null default now()
+);
+
+-- مدارک/آزمایش‌های بارگذاری‌شده توسط پزشک (فایل واقعی در باکت medical-documents)
+create table public.medical_documents (
+  id uuid primary key default gen_random_uuid(),
+  patient_file_id uuid not null references public.patient_files (id) on delete cascade,
+  uploaded_by uuid not null references public.profiles (id),
+  file_path text not null,
+  file_name text not null,
+  created_at timestamptz not null default now()
+);
+
+-- ثبت قصد مشارکت مالی خیّر — نه پرداخت واقعی؛ تا اتصال یک درگاه واقعی،
+-- مددکار/ادمین با خیّر هماهنگ می‌کنند و بعد از دریافت واقعی، fulfilled می‌شود.
+create table public.donation_pledges (
+  id uuid primary key default gen_random_uuid(),
+  support_request_id uuid not null references public.support_requests (id) on delete cascade,
+  donor_id uuid not null references public.profiles (id),
+  amount numeric not null check (amount > 0),
+  message text,
+  status text not null default 'pledged' check (status in ('pledged', 'fulfilled', 'cancelled')),
+  created_at timestamptz not null default now(),
+  fulfilled_at timestamptz
+);
+
 -- دید غیرشخصی برای داشبورد خیّرین: فقط نیازهای تاییدشده، بدون هیچ داده‌ی
 -- شناسایی‌کننده‌ی کودک یا خانواده.
 create view public.donor_visible_requests as
-  select id, category, description, city, status, created_at
+  select id, category, description, city, status, required_amount, raised_amount, created_at
   from public.support_requests
   where status = 'approved';
 
@@ -194,6 +271,12 @@ alter table public.mental_health_results enable row level security;
 alter table public.support_requests enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.case_notes enable row level security;
+alter table public.referrals enable row level security;
+alter table public.medical_reports enable row level security;
+alter table public.psychology_reports enable row level security;
+alter table public.academic_reports enable row level security;
+alter table public.medical_documents enable row level security;
+alter table public.donation_pledges enable row level security;
 
 -- profiles: هر کاربر پروفایل خودش را می‌بیند/ویرایش می‌کند؛ ادمین همه را می‌بیند.
 create policy "profiles_select_own_or_admin"
@@ -252,7 +335,7 @@ create policy "doctor_reports_select_related"
     exists (
       select 1 from public.patient_files pf
       where pf.id = patient_file_id
-        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid())
+        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid() or pf.psychologist_id = auth.uid())
     )
     or public.current_role() = 'admin'
   );
@@ -272,7 +355,7 @@ create policy "parent_reports_select_related"
     exists (
       select 1 from public.patient_files pf
       where pf.id = patient_file_id
-        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid())
+        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid() or pf.psychologist_id = auth.uid())
     )
     or public.current_role() = 'admin'
   );
@@ -293,7 +376,7 @@ create policy "mental_health_select_related"
     exists (
       select 1 from public.patient_files pf
       where pf.id = patient_file_id
-        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid())
+        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid() or pf.psychologist_id = auth.uid())
     )
     or public.current_role() = 'admin'
   );
@@ -374,5 +457,216 @@ create policy "case_notes_update_assigned_specialist"
           or (role = 'psychologist' and pf.psychologist_id = auth.uid())
           or (role = 'teacher' and pf.teacher_id = auth.uid())
         )
+    )
+  );
+
+-- referrals: مددکارِ سازنده و متخصصِ ارجاع‌شده می‌بینند/به‌روزرسانی می‌کنند.
+create policy "referrals_select_related"
+  on public.referrals for select
+  using (
+    created_by = auth.uid()
+    or assigned_to_user_id = auth.uid()
+    or public.current_role() = 'admin'
+  );
+
+create policy "referrals_insert_social_worker"
+  on public.referrals for insert
+  with check (
+    created_by = auth.uid()
+    and exists (select 1 from public.patient_files pf where pf.id = case_id and pf.created_by = auth.uid())
+  );
+
+create policy "referrals_update_owner_or_assignee"
+  on public.referrals for update
+  using (
+    created_by = auth.uid()
+    or assigned_to_user_id = auth.uid()
+    or public.current_role() = 'admin'
+  );
+
+-- متخصصِ اختصاص‌یافته به پرونده باید بتواند ارجاع خودش را completed کند
+-- (assigned_to_user_id هیچ‌جای برنامه پر نمی‌شود، پس policy بالا کافی نیست).
+create policy "referrals_update_specialist_on_own_case"
+  on public.referrals for update
+  using (
+    exists (
+      select 1 from public.patient_files pf
+      where pf.id = case_id
+        and (
+          (referred_to_role = 'doctor' and pf.doctor_id = auth.uid())
+          or (referred_to_role = 'psychologist' and pf.psychologist_id = auth.uid())
+          or (referred_to_role = 'teacher' and pf.teacher_id = auth.uid())
+        )
+    )
+  );
+
+-- medical_reports: طرف‌های مرتبط می‌بینند؛ فقط پزشکِ اختصاص‌یافته می‌نویسد/ویرایش می‌کند.
+create policy "medical_reports_select_related"
+  on public.medical_reports for select
+  using (
+    exists (
+      select 1 from public.patient_files pf
+      where pf.id = patient_file_id
+        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid())
+    )
+    or public.current_role() = 'admin'
+  );
+
+create policy "medical_reports_insert_assigned_doctor"
+  on public.medical_reports for insert
+  with check (
+    author_id = auth.uid()
+    and exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.doctor_id = auth.uid())
+  );
+
+create policy "medical_reports_update_assigned_doctor"
+  on public.medical_reports for update
+  using (exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.doctor_id = auth.uid()));
+
+-- psychology_reports: طرف‌های مرتبط می‌بینند؛ فقط روان‌شناسِ اختصاص‌یافته می‌نویسد/ویرایش می‌کند.
+create policy "psychology_reports_select_related"
+  on public.psychology_reports for select
+  using (
+    exists (
+      select 1 from public.patient_files pf
+      where pf.id = patient_file_id
+        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.psychologist_id = auth.uid())
+    )
+    or public.current_role() = 'admin'
+  );
+
+create policy "psychology_reports_insert_assigned_psychologist"
+  on public.psychology_reports for insert
+  with check (
+    author_id = auth.uid()
+    and exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.psychologist_id = auth.uid())
+  );
+
+create policy "psychology_reports_update_assigned_psychologist"
+  on public.psychology_reports for update
+  using (exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.psychologist_id = auth.uid()));
+
+-- academic_reports: طرف‌های مرتبط می‌بینند؛ فقط معلمِ اختصاص‌یافته می‌نویسد/ویرایش می‌کند.
+create policy "academic_reports_select_related"
+  on public.academic_reports for select
+  using (
+    exists (
+      select 1 from public.patient_files pf
+      where pf.id = patient_file_id
+        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.teacher_id = auth.uid())
+    )
+    or public.current_role() = 'admin'
+  );
+
+create policy "academic_reports_insert_assigned_teacher"
+  on public.academic_reports for insert
+  with check (
+    author_id = auth.uid()
+    and exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.teacher_id = auth.uid())
+  );
+
+create policy "academic_reports_update_assigned_teacher"
+  on public.academic_reports for update
+  using (exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.teacher_id = auth.uid()));
+
+-- medical_documents: طرف‌های مرتبط می‌بینند؛ فقط پزشکِ اختصاص‌یافته آپلود می‌کند.
+create policy "medical_documents_select_related"
+  on public.medical_documents for select
+  using (
+    exists (
+      select 1 from public.patient_files pf
+      where pf.id = patient_file_id
+        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid())
+    )
+    or public.current_role() = 'admin'
+  );
+
+create policy "medical_documents_insert_assigned_doctor"
+  on public.medical_documents for insert
+  with check (
+    uploaded_by = auth.uid()
+    and exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.doctor_id = auth.uid())
+  );
+
+-- باکت ذخیره‌سازی خصوصی برای مدارک پزشکی؛ مسیر فایل: {patient_file_id}/{نام فایل}
+insert into storage.buckets (id, name, public)
+values ('medical-documents', 'medical-documents', false)
+on conflict (id) do nothing;
+
+create policy "medical_documents_storage_select"
+  on storage.objects for select
+  using (
+    bucket_id = 'medical-documents'
+    and exists (
+      select 1 from public.patient_files pf
+      where pf.id::text = (storage.foldername(name))[1]
+        and (pf.created_by = auth.uid() or pf.parent_id = auth.uid() or pf.doctor_id = auth.uid())
+    )
+  );
+
+create policy "medical_documents_storage_insert"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'medical-documents'
+    and exists (
+      select 1 from public.patient_files pf
+      where pf.id::text = (storage.foldername(name))[1] and pf.doctor_id = auth.uid()
+    )
+  );
+
+-- donation_pledges: خیّرِ صاحبِ قول، مددکارِ سازنده‌ی پرونده، یا ادمین می‌بینند.
+create policy "donation_pledges_select_related"
+  on public.donation_pledges for select
+  using (
+    donor_id = auth.uid()
+    or public.current_role() = 'admin'
+    or exists (
+      select 1 from public.support_requests sr
+      join public.patient_files pf on pf.id = sr.patient_file_id
+      where sr.id = support_request_id and pf.created_by = auth.uid()
+    )
+  );
+
+create policy "donation_pledges_insert_donor"
+  on public.donation_pledges for insert
+  with check (
+    donor_id = auth.uid()
+    and public.current_role() = 'donor'
+    and exists (select 1 from public.support_requests sr where sr.id = support_request_id and sr.status = 'approved')
+  );
+
+create policy "donation_pledges_update_owner_or_staff"
+  on public.donation_pledges for update
+  using (
+    donor_id = auth.uid()
+    or public.current_role() = 'admin'
+    or exists (
+      select 1 from public.support_requests sr
+      join public.patient_files pf on pf.id = sr.patient_file_id
+      where sr.id = support_request_id and pf.created_by = auth.uid()
+    )
+  );
+
+-- دسترسی خواندنِ متقابل تیم درمانی: پزشک و روان‌شناسِ همان پرونده
+-- یادداشت ساختاریافته‌ی یکدیگر را ببینند (نه معلم، نه خیّر).
+create policy "medical_reports_select_team_psychologist"
+  on public.medical_reports for select
+  using (exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.psychologist_id = auth.uid()));
+
+create policy "psychology_reports_select_team_doctor"
+  on public.psychology_reports for select
+  using (exists (select 1 from public.patient_files pf where pf.id = patient_file_id and pf.doctor_id = auth.uid()));
+
+-- مددکار برای هماهنگی دریافت وجه، باید نام خیّری که روی یکی از پرونده‌های
+-- خودش قصد مشارکت ثبت کرده را ببیند.
+create policy "profiles_select_donor_with_pledge_on_own_case"
+  on public.profiles for select
+  using (
+    role = 'donor'
+    and exists (
+      select 1 from public.donation_pledges dp
+      join public.support_requests sr on sr.id = dp.support_request_id
+      join public.patient_files pf on pf.id = sr.patient_file_id
+      where dp.donor_id = profiles.id and pf.created_by = auth.uid()
     )
   );

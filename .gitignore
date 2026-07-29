@@ -24,3 +24,6 @@ next-env.d.ts
 # editor
 .vscode/*
 !.vscode/extensions.json
+
+# local dev tooling (machine-specific paths)
+.claude/

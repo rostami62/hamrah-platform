@@ -16,7 +16,7 @@ export default async function AdminDashboardPage() {
 
   const [{ data: pendingDoctors }, { data: pendingRequests }, { data: logs }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, national_id, role, created_at").in("role", ["doctor", "psychologist"]).eq("verified", false),
-    supabase.from("support_requests").select("id, patient_file_id, category, description, city, created_at").eq("status", "pending"),
+    supabase.from("support_requests").select("id, patient_file_id, category, description, city, required_amount, created_at").eq("status", "pending"),
     supabase.from("audit_logs").select("id, action, target_table, target_id, created_at").order("created_at", { ascending: false }).limit(20),
   ]);
 

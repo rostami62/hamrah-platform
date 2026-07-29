@@ -12,6 +12,7 @@ interface PendingSupportRequest {
   patient_file_id: string;
   category: string;
   description: string;
+  required_amount: number | null;
 }
 
 export function PendingSupportRequests({
@@ -57,6 +58,11 @@ export function PendingSupportRequests({
               </div>
             </div>
             <p className="mt-1 text-sm text-primary-600">{req.description}</p>
+            {req.required_amount != null && (
+              <p className="mt-1 text-xs text-primary-500">
+                مبلغ موردنیاز: {req.required_amount.toLocaleString("fa-IR")} تومان
+              </p>
+            )}
           </div>
         ))}
       </div>

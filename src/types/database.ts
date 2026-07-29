@@ -22,11 +22,19 @@ export type PatientFileStatus =
   | "awaiting_parent"
   | "active";
 
+export type CaseStatus = "open" | "under_review" | "completed";
+export type CaseUrgency = "low" | "medium" | "high" | "emergency";
+
 export type SelfReportRole = "doctor" | "parent";
 
 export type SupportRequestStatus = "pending" | "approved" | "fulfilled" | "rejected";
 
 export type CaseNoteRole = "doctor" | "psychologist" | "teacher";
+
+export type PledgeStatus = "pledged" | "fulfilled" | "cancelled";
+
+export type ReferralRole = "doctor" | "psychologist" | "teacher" | "donor";
+export type ReferralStatus = "pending" | "completed";
 
 export interface Database {
   public: {
@@ -65,6 +73,8 @@ export interface Database {
           psychologist_id: string | null;
           teacher_id: string | null;
           status: PatientFileStatus;
+          case_status: CaseStatus;
+          urgency: CaseUrgency;
           created_at: string;
         };
         Insert: {
@@ -73,6 +83,8 @@ export interface Database {
           child_full_name: string;
           created_by: string;
           status?: PatientFileStatus;
+          case_status?: CaseStatus;
+          urgency?: CaseUrgency;
         };
         Update: Partial<{
           parent_id: string | null;
@@ -80,6 +92,8 @@ export interface Database {
           psychologist_id: string | null;
           teacher_id: string | null;
           status: PatientFileStatus;
+          case_status: CaseStatus;
+          urgency: CaseUrgency;
         }>;
         Relationships: [];
       };
@@ -189,6 +203,8 @@ export interface Database {
           description: string;
           city: string | null;
           status: SupportRequestStatus;
+          required_amount: number | null;
+          raised_amount: number;
           created_by: string;
           created_at: string;
         };
@@ -198,9 +214,10 @@ export interface Database {
           category: string;
           description: string;
           city?: string | null;
+          required_amount?: number | null;
           created_by: string;
         };
-        Update: Partial<{ status: SupportRequestStatus }>;
+        Update: Partial<{ status: SupportRequestStatus; required_amount: number | null; raised_amount: number }>;
         Relationships: [];
       };
       audit_logs: {
@@ -240,6 +257,153 @@ export interface Database {
         Update: Partial<{ note: string }>;
         Relationships: [];
       };
+      referrals: {
+        Row: {
+          id: string;
+          case_id: string;
+          referred_to_role: ReferralRole;
+          assigned_to_user_id: string | null;
+          status: ReferralStatus;
+          created_by: string;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          case_id: string;
+          referred_to_role: ReferralRole;
+          assigned_to_user_id?: string | null;
+          status?: ReferralStatus;
+          created_by: string;
+        };
+        Update: Partial<{
+          assigned_to_user_id: string | null;
+          status: ReferralStatus;
+          completed_at: string | null;
+        }>;
+        Relationships: [];
+      };
+      medical_reports: {
+        Row: {
+          id: string;
+          patient_file_id: string;
+          author_id: string;
+          diagnosis: string | null;
+          medications: string | null;
+          treatment_plan: string | null;
+          next_visit_date: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          patient_file_id: string;
+          author_id: string;
+          diagnosis?: string | null;
+          medications?: string | null;
+          treatment_plan?: string | null;
+          next_visit_date?: string | null;
+        };
+        Update: Partial<{
+          diagnosis: string | null;
+          medications: string | null;
+          treatment_plan: string | null;
+          next_visit_date: string | null;
+        }>;
+        Relationships: [];
+      };
+      psychology_reports: {
+        Row: {
+          id: string;
+          patient_file_id: string;
+          author_id: string;
+          behavioral_assessment: string | null;
+          therapy_session_notes: string | null;
+          mental_status: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          patient_file_id: string;
+          author_id: string;
+          behavioral_assessment?: string | null;
+          therapy_session_notes?: string | null;
+          mental_status?: string | null;
+        };
+        Update: Partial<{
+          behavioral_assessment: string | null;
+          therapy_session_notes: string | null;
+          mental_status: string | null;
+        }>;
+        Relationships: [];
+      };
+      academic_reports: {
+        Row: {
+          id: string;
+          patient_file_id: string;
+          author_id: string;
+          academic_performance: string | null;
+          school_behavior: string | null;
+          attendance_status: string | null;
+          educational_needs: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          patient_file_id: string;
+          author_id: string;
+          academic_performance?: string | null;
+          school_behavior?: string | null;
+          attendance_status?: string | null;
+          educational_needs?: string | null;
+        };
+        Update: Partial<{
+          academic_performance: string | null;
+          school_behavior: string | null;
+          attendance_status: string | null;
+          educational_needs: string | null;
+        }>;
+        Relationships: [];
+      };
+      medical_documents: {
+        Row: {
+          id: string;
+          patient_file_id: string;
+          uploaded_by: string;
+          file_path: string;
+          file_name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          patient_file_id: string;
+          uploaded_by: string;
+          file_path: string;
+          file_name: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      donation_pledges: {
+        Row: {
+          id: string;
+          support_request_id: string;
+          donor_id: string;
+          amount: number;
+          message: string | null;
+          status: PledgeStatus;
+          created_at: string;
+          fulfilled_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          support_request_id: string;
+          donor_id: string;
+          amount: number;
+          message?: string | null;
+        };
+        Update: Partial<{ status: PledgeStatus; fulfilled_at: string | null }>;
+        Relationships: [];
+      };
     };
     Views: {
       donor_visible_requests: {
@@ -249,6 +413,8 @@ export interface Database {
           description: string;
           city: string | null;
           status: SupportRequestStatus;
+          required_amount: number | null;
+          raised_amount: number;
           created_at: string;
         };
         Relationships: [];

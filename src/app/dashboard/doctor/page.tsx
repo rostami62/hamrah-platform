@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { DISEASE_TYPE_OPTIONS, PROGNOSIS_OPTIONS } from "@/lib/roadmap/options";
-import { CaseNoteForm } from "@/components/patient-files/case-note-form";
+import { MedicalReportForm } from "@/components/patient-files/medical-report-form";
+import { DocumentUpload } from "@/components/patient-files/document-upload";
 
 export default async function DoctorDashboardPage() {
   const profile = await getCurrentProfile();
@@ -26,13 +27,16 @@ export default async function DoctorDashboardPage() {
     .order("created_at", { ascending: false });
 
   const fileIds = (files ?? []).map((f) => f.id);
-  const [{ data: reports }, { data: notes }] = await Promise.all([
+  const [{ data: intakeReports }, { data: medicalReports }, { data: documents }] = await Promise.all([
     fileIds.length
       ? supabase.from("doctor_reports").select("patient_file_id, disease_type, prognosis").in("patient_file_id", fileIds)
       : Promise.resolve({ data: [] as { patient_file_id: string; disease_type: string; prognosis: string }[] }),
     fileIds.length
-      ? supabase.from("case_notes").select("patient_file_id, note").eq("role", "doctor").in("patient_file_id", fileIds)
-      : Promise.resolve({ data: [] as { patient_file_id: string; note: string }[] }),
+      ? supabase.from("medical_reports").select("*").in("patient_file_id", fileIds)
+      : Promise.resolve({ data: [] as { patient_file_id: string; diagnosis: string | null; medications: string | null; treatment_plan: string | null; next_visit_date: string | null }[] }),
+    fileIds.length
+      ? supabase.from("medical_documents").select("id, patient_file_id, file_name").in("patient_file_id", fileIds)
+      : Promise.resolve({ data: [] as { id: string; patient_file_id: string; file_name: string }[] }),
   ]);
 
   return (
@@ -47,19 +51,21 @@ export default async function DoctorDashboardPage() {
           </p>
         )}
         {(files ?? []).map((file) => {
-          const report = (reports ?? []).find((r) => r.patient_file_id === file.id);
-          const note = (notes ?? []).find((n) => n.patient_file_id === file.id);
+          const intake = (intakeReports ?? []).find((r) => r.patient_file_id === file.id);
+          const report = (medicalReports ?? []).find((r) => r.patient_file_id === file.id) ?? null;
+          const docs = (documents ?? []).filter((d) => d.patient_file_id === file.id);
           return (
             <article key={file.id} className="surface rounded-[var(--radius-card)] p-5">
               <h3 className="font-semibold text-primary-900">{file.child_full_name}</h3>
-              {report && (
+              {intake && (
                 <p className="mt-1 text-sm text-primary-600">
-                  {DISEASE_TYPE_OPTIONS[report.disease_type as keyof typeof DISEASE_TYPE_OPTIONS] ?? report.disease_type}
+                  خوداظهاری اولیه: {DISEASE_TYPE_OPTIONS[intake.disease_type as keyof typeof DISEASE_TYPE_OPTIONS] ?? intake.disease_type}
                   {" — "}
-                  {PROGNOSIS_OPTIONS[report.prognosis as keyof typeof PROGNOSIS_OPTIONS] ?? report.prognosis}
+                  {PROGNOSIS_OPTIONS[intake.prognosis as keyof typeof PROGNOSIS_OPTIONS] ?? intake.prognosis}
                 </p>
               )}
-              <CaseNoteForm patientFileId={file.id} role="doctor" initialNote={note?.note ?? ""} />
+              <MedicalReportForm patientFileId={file.id} initial={report} />
+              <DocumentUpload patientFileId={file.id} existingDocuments={docs} />
             </article>
           );
         })}

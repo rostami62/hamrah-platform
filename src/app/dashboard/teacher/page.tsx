@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/session";
-import { CaseNoteForm } from "@/components/patient-files/case-note-form";
+import { AcademicReportForm } from "@/components/patient-files/academic-report-form";
 
 export default async function TeacherDashboardPage() {
   const profile = await getCurrentProfile();
@@ -13,9 +13,9 @@ export default async function TeacherDashboardPage() {
     .order("created_at", { ascending: false });
 
   const fileIds = (files ?? []).map((f) => f.id);
-  const { data: notes } = fileIds.length
-    ? await supabase.from("case_notes").select("patient_file_id, note").eq("role", "teacher").in("patient_file_id", fileIds)
-    : { data: [] as { patient_file_id: string; note: string }[] };
+  const { data: reports } = fileIds.length
+    ? await supabase.from("academic_reports").select("*").in("patient_file_id", fileIds)
+    : { data: [] as { patient_file_id: string; academic_performance: string | null; school_behavior: string | null; attendance_status: string | null; educational_needs: string | null }[] };
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
@@ -29,11 +29,11 @@ export default async function TeacherDashboardPage() {
           </div>
         ) : (
           files!.map((file) => {
-            const note = (notes ?? []).find((n) => n.patient_file_id === file.id);
+            const report = (reports ?? []).find((r) => r.patient_file_id === file.id) ?? null;
             return (
               <article key={file.id} className="surface rounded-[var(--radius-card)] p-5">
                 <h3 className="font-semibold text-primary-900">{file.child_full_name}</h3>
-                <CaseNoteForm patientFileId={file.id} role="teacher" initialNote={note?.note ?? ""} />
+                <AcademicReportForm patientFileId={file.id} initial={report} />
               </article>
             );
           })
